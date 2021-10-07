@@ -1665,6 +1665,13 @@ ValueWithOffsets MLIRScanner::VisitBinaryOperator(clang::BinaryOperator *BO) {
                                                        rhs.getValue(builder)),
                             /*isReference*/ false);
   }
+  case clang::BinaryOperator::Opcode::BO_Xor: {
+    // TODO short circuit
+    return ValueWithOffsets(builder.create<mlir::XOrOp>(loc,
+                                                        lhs.getValue(builder),
+                                                        rhs.getValue(builder)),
+                            /*isReference*/ false);
+  }
   case clang::BinaryOperator::Opcode::BO_GT: {
     auto lhs_v = lhs.getValue(builder);
     mlir::Value res;
@@ -1982,6 +1989,18 @@ ValueWithOffsets MLIRScanner::VisitBinaryOperator(clang::BinaryOperator *BO) {
 
     mlir::Value result =
         builder.create<mlir::OrOp>(loc, prev, rhs.getValue(builder));
+    assert(result.getType() ==
+           lhs.val.getType().cast<MemRefType>().getElementType());
+    builder.create<mlir::memref::StoreOp>(
+        loc, result, lhs.val, std::vector<mlir::Value>({getConstantIndex(0)}));
+    return lhs;
+  }
+  case clang::BinaryOperator::Opcode::BO_XorAssign: {
+    assert(lhs.isReference);
+    auto prev = lhs.getValue(builder);
+
+    mlir::Value result =
+        builder.create<mlir::XOrOp>(loc, prev, rhs.getValue(builder));
     assert(result.getType() ==
            lhs.val.getType().cast<MemRefType>().getElementType());
     builder.create<mlir::memref::StoreOp>(
